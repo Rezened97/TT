@@ -6,3 +6,4 @@ bcrypt
 facebook-business
 streamlit-authenticator
 opencv-python-headless
+python-dotenv
