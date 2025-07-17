@@ -133,7 +133,6 @@ if not assigned_pixels:
 
 pix_opts  = [f"{px['name']} ({px['id']})" for px in assigned_pixels]
 sel_pixel = st.sidebar.selectbox("3️⃣ Pixel", pix_opts)
-st.write("DEBUG sel_pixel:", sel_pixel, "| type:", type(sel_pixel))
 pixel_id  = clean_id(sel_pixel)
 
 # ——— Sidebar: scelta Campagna e AdSet ———
