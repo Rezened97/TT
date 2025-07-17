@@ -1,3 +1,9 @@
+from dotenv import load_dotenv
+import os
+
+# Carica il .env nella root del progetto
+load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
+
 import os
 os.environ["STREAMLIT_DEVELOPMENT_MODE"] = "false"
 
