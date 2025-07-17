@@ -27,17 +27,6 @@ from utils.api_helpers import APIHelper
 # luca  = "secret456"
 CREDENTIALS = st.secrets["credentials"]
 
-st.write(
-    "DEBUG secrets:",
-    "API_VERSION =", API_VERSION,
-    "AD_ACCOUNT_ID =", AD_ACCOUNT_ID,
-    "APP_ID =", APP_ID,
-    "APP_SECRET =", APP_SECRET,
-    "ACCESS_TOKEN =", ACCESS_TOKEN,
-    "FB_BUSINESS_ID =", FB_BUSINESS_ID,
-    "PIXEL_ID =", PIXEL_ID
-)
-
 # 1) Inizializza lo stato di autenticazione
 if "authed" not in st.session_state:
     st.session_state.authed = False
@@ -131,7 +120,7 @@ for px in all_pixels:
     try:
         resp = api_dbg.make_get_request(
             f"{px['id']}/assigned_users",
-            params={"fields": "id", "business": st.secrets["fb_business_id"]}
+            params={"fields": "id", "business": st.secrets["FB_BUSINESS_ID"]}
         )
         users = resp.get("data", [])
         if system_user_id and any(u["id"] == system_user_id for u in users):
