@@ -27,6 +27,17 @@ from utils.api_helpers import APIHelper
 # luca  = "secret456"
 CREDENTIALS = st.secrets["credentials"]
 
+st.write(
+    "DEBUG secrets:",
+    "API_VERSION =", API_VERSION,
+    "AD_ACCOUNT_ID =", AD_ACCOUNT_ID,
+    "APP_ID =", APP_ID,
+    "APP_SECRET =", APP_SECRET,
+    "ACCESS_TOKEN =", ACCESS_TOKEN,
+    "FB_BUSINESS_ID =", FB_BUSINESS_ID,
+    "PIXEL_ID =", PIXEL_ID
+)
+
 # 1) Inizializza lo stato di autenticazione
 if "authed" not in st.session_state:
     st.session_state.authed = False
@@ -55,17 +66,6 @@ if st.sidebar.button("Logout"):
 
 # ——— Configurazione Streamlit ———
 st.set_page_config(page_title="AdLaunch", layout="wide")
-
-st.write(
-    "DEBUG secrets:",
-    "API_VERSION =", API_VERSION,
-    "AD_ACCOUNT_ID =", AD_ACCOUNT_ID,
-    "APP_ID =", APP_ID,
-    "APP_SECRET =", APP_SECRET,
-    "ACCESS_TOKEN =", ACCESS_TOKEN,
-    "FB_BUSINESS_ID =", FB_BUSINESS_ID,
-    "PIXEL_ID =", PIXEL_ID
-)
 
 # ——— Logging ———
 LOG_FILE = os.path.join(os.path.dirname(__file__), "adlaunch_debug.log")
