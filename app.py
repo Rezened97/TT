@@ -21,6 +21,17 @@ from core.creative import upload_image, upload_video, create_ad_creative, create
 from core.meta_data import fetch_ad_accounts, fetch_pages
 from utils.api_helpers import APIHelper
 
+st.write(
+    "DEBUG secrets:",
+    "API_VERSION =", API_VERSION,
+    "AD_ACCOUNT_ID =", AD_ACCOUNT_ID,
+    "APP_ID =", APP_ID,
+    "APP_SECRET =", APP_SECRET,
+    "ACCESS_TOKEN =", ACCESS_TOKEN,
+    "FB_BUSINESS_ID =", FB_BUSINESS_ID,
+    "PIXEL_ID =", PIXEL_ID
+)
+
 # Carica la mappa username→password da secrets.toml
 # [credentials]
 # mario = "pass123"
