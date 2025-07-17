@@ -1,0 +1,46 @@
+# core/meta_data.py
+
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from utils.api_helpers import APIHelper
+from config.settings import AD_ACCOUNT_ID
+
+api_helper = APIHelper()
+
+def fetch_ad_accounts():
+    """
+    Ritorna la lista di ad accounts legati all'utente di sistema:
+    [{ 'id': 'act_...', 'name': 'Nome Account' }, ...]
+    """
+    data = api_helper.make_get_request(
+        "me/adaccounts",
+        params={"fields": "id,name"}
+    )
+    return data.get("data", [])
+
+
+def fetch_pages():
+    """
+    Ritorna la lista di Pagine collegate all'utente di sistema,
+    incluse le page access token:
+    [{ 'id': '12345', 'name': 'Pagina FB', 'access_token': '...' }, ...]
+    """
+    data = api_helper.make_get_request(
+        "me/accounts",
+        params={"fields": "id,name,access_token"}
+    )
+    return data.get("data", [])
+
+
+def fetch_pixels():
+    """
+    Ritorna la lista di Pixel per l'ad account principale:
+    [{ 'id': '54321', 'name': 'PixelName' }, ...]
+    """
+    endpoint = f"act_{AD_ACCOUNT_ID}/adspixels"
+    data = api_helper.make_get_request(
+        endpoint,
+        params={"fields": "id,name"}
+    )
+    return data.get("data", [])

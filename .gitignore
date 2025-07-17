@@ -1,0 +1,16 @@
+.env
+build/adlaunch/adlaunch.pkg
+dist/adlaunch.exe
+
+
+# Build e distribuzioni
+build/
+dist/
+
+# Eseguibili
+*.exe
+*.pkg
+
+# Virtualenv
+.venv/
+venv/

@@ -1,0 +1,81 @@
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import streamlit as st
+from core.campaign import create_campaign
+from core.meta_data import fetch_ad_accounts, fetch_pages, fetch_pixels
+
+
+def render_interface():
+    # --- Selezione dinamica di account, pagine e pixel ---
+    accounts = fetch_ad_accounts()
+    account_options = [f"{a['name']} ({a['id']})" for a in accounts]
+    selected_account = st.selectbox("Scegli Ad Account", account_options)
+
+    pages = fetch_pages()
+    page_options = [f"{p['name']} ({p['id']})" for p in pages]
+    selected_page = st.selectbox("Scegli Pagina FB", page_options)
+
+    pixels = fetch_pixels()
+    pixel_options = [f"{px['name']} ({px['id']})" for px in pixels]
+    selected_pixel = st.selectbox("Scegli Pixel", pixel_options)
+
+    # Form per la creazione della campagna
+    with st.form("campagna_form"):
+        st.header("Info Campagna")
+        campaign_name = st.text_input("Nome campagna")
+        objective = st.selectbox(
+            "Obiettivo campagna", ["Conversions", "Traffic", "Awareness", "Leads"]
+        )
+        budget = st.number_input(
+            "Budget giornaliero (€)", min_value=1.0, value=10.0, step=1.0
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Data inizio")
+        with col2:
+            end_date = st.date_input("Data fine")
+
+        st.header("Target")
+        location = st.selectbox(
+            "Localizzazione (Paese)", ["Italia", "Worldwide"]
+        )
+        audience = st.radio(
+            "Pubblico", ["Broad (predefinito)"]
+        )
+
+        st.header("Creatività")
+        creative_file = st.file_uploader(
+            "Upload immagine/video", type=["png", "jpg", "jpeg", "mp4"]
+        )
+        primary_text = st.text_area("Testo principale")
+        headline = st.text_input("Titolo")
+        url = st.text_input("Link di destinazione")
+
+        st.header("Pixel ed eventi")
+        event = st.selectbox(
+            "Evento di conversione", ["Purchase", "Lead", "CompleteRegistration"]
+        )
+
+        submitted = st.form_submit_button("CREA CAMPAGNA 🔥")
+
+    # Al submit, crea la campagna tramite Meta API e mostra selezione risorse
+    if submitted:
+        # Estrai ID puro dalle opzioni selezionate
+        account_id = selected_account.split("(")[-1].rstrip(")")
+        page_id = selected_page.split("(")[-1].rstrip(")")
+        pixel_id = selected_pixel.split("(")[-1].rstrip(")")
+
+        st.info("Invio dati a Meta... Attendere")
+        try:
+            campagna_id = create_campaign(
+                name=campaign_name,
+                objective=objective,
+                status="PAUSED"
+            )
+            st.success(f"Campagna creata con successo! ID: {campagna_id}")
+            st.write(f"**Account selezionato:** {selected_account}")
+            st.write(f"**Pagina selezionata:** {selected_page}")
+            st.write(f"**Pixel selezionato:** {selected_pixel}")
+        except Exception as e:
+            st.error(f"Errore creazione campagna: {e}")

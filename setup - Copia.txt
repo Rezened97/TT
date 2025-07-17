@@ -1,0 +1,68 @@
+<#
+.PowerShell Script: setup.ps1
+Purpose: Bootstrap Python 3.x, create venv, install dependencies, and launch Streamlit app.
+Ho corretto la sintassi di PowerShell per l’interpolazione delle variabili:
+
+Instructions: Run PowerShell as Administrator and execute via run-setup.bat.
+#>
+Param()
+
+function Test-Python {
+    param($cmd)
+    try {
+        $out = & $cmd --version 2>&1
+        if ($out -match '^Python\s+3\.') {
+            return $out.Trim()
+        }
+    } catch {
+        # ignore
+    }
+    return $null
+}
+
+# Detect Python interpreter
+$pythonCmd = $null
+$pythonVersion = $null
+foreach ($cmd in @('py','python','python3')) {
+    $ver = Test-Python $cmd
+    if ($ver) {
+        $pythonCmd = $cmd
+        $pythonVersion = $ver
+        break
+    }
+}
+
+if (-not $pythonCmd) {
+    Write-Host 'Python 3 non trovato. Provo a installarlo con winget o Chocolatey...'
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id Python.Python.3 -e --silent
+    } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+        choco install python -y
+    } else {
+        Write-Error 'Nessun package manager disponibile. Installa Python manualmente da https://python.org/downloads/windows/'
+        exit 1
+    }
+    Write-Host 'Reinvio script per rilevare il nuovo Python...'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+    exit 0
+}
+
+Write-Host "Usando $($pythonCmd): $($pythonVersion)"
+
+# Create virtual environment
+if (-not (Test-Path .\venv)) {
+    Write-Host 'Creazione virtual environment...'
+    & $pythonCmd -m venv .\venv
+}
+
+# Activate venv and install dependencies
+Write-Host 'Attivazione virtualenv e installazione dipendenze...'
+. .\venv\Scripts\Activate.ps1
+& $pythonCmd -m pip install --upgrade pip
+& pip install -r requirements.txt
+
+# Launch Streamlit
+Write-Host 'Avvio Streamlit application...'
+Start-Process -FilePath $pythonCmd -ArgumentList '-m','streamlit','run','app.py','--server.port=8501','--server.headless=true'
+Start-Sleep -Seconds 5
+Start-Process 'http://localhost:8501'

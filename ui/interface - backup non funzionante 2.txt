@@ -1,0 +1,108 @@
+# ui/interface.py
+
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import streamlit as st
+import logging
+import traceback
+
+from core.campaign import create_campaign
+from core.adset import create_adset
+from core.meta_data import fetch_ad_accounts, fetch_pages, fetch_pixels
+
+# —————— Logging ——————
+LOG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "adlaunch_debug.log")
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+logging.debug("UI load start")
+
+# (st.set_page_config rimane in app.py)
+
+st.title("AdLaunch – Creazione Campagna & AdSet")
+st.write("🚩 INTERFACCIA LINEARE V3 CARICATA")
+
+# — Sidebar: Resource Selectors ——
+accounts = fetch_ad_accounts()
+pages    = fetch_pages()
+pixels   = fetch_pixels()
+
+account_opts = [f"{a['name']} ({a['id']})" for a in accounts]
+page_opts    = [f"{p['name']} ({p['id']})" for p in pages]
+pixel_opts   = [f"{px['name']} ({px['id']})" for px in pixels]
+
+sel_acc   = st.sidebar.selectbox("1️⃣ Scegli Ad Account", account_opts)
+sel_page  = st.sidebar.selectbox("2️⃣ Scegli Pagina FB", page_opts)
+sel_pixel = st.sidebar.selectbox("3️⃣ Scegli Pixel", pixel_opts)
+
+def clean_id(raw: str) -> str:
+    val = raw.split("(")[-1].rstrip(")")
+    return val.removeprefix("act_") if hasattr(val, "removeprefix") else (val[4:] if val.startswith("act_") else val)
+
+# — Campagna ——
+st.subheader("📣 Crea Campagna")
+camp_name    = st.text_input("Nome campagna", key="camp_name")
+objective    = st.selectbox("Obiettivo campagna", ["Conversions", "Traffic", "Awareness", "Leads"], key="camp_obj")
+daily_budget = st.number_input("Budget giornaliero (€)", min_value=1.0, value=10.0, step=1.0, key="camp_budget")
+bid_strategy = st.selectbox("Strategia di offerta", ["BID_CAP", "LOWEST_COST_WITHOUT_CAP", "LOWEST_COST_WITH_BID_CAP"], key="camp_bid")
+
+if st.button("🚀 Crea Campagna", key="btn_create_campaign"):
+    logging.debug(f"Creating campaign: {camp_name!r}, {objective}, {daily_budget}, {bid_strategy}")
+    st.write("🔍 DEBUG: submit ricevuto")
+    try:
+        acc_id = clean_id(sel_acc)
+        campaign_id = create_campaign(
+            name=camp_name,
+            objective=objective,
+            status="PAUSED",
+            account_id=acc_id,
+            daily_budget=daily_budget,
+            bid_strategy=bid_strategy
+        )
+        logging.debug(f"create_campaign returned ID={campaign_id}")
+        st.success(f"✅ Campagna creata! ID: {campaign_id}")
+        st.session_state.campaign_id = campaign_id
+    except Exception as e:
+        logging.exception("Errore create_campaign")
+        st.error(f"❌ Errore creazione campagna: {e}")
+        st.text(traceback.format_exc())
+
+st.markdown("---")
+
+# — AdSet ——
+st.subheader("🎯 Crea AdSet")
+if "campaign_id" not in st.session_state:
+    st.warning("🚨 Crea prima la campagna qui sopra.")
+else:
+    as_name   = st.text_input("Nome AdSet", key="as_name")
+    location  = st.selectbox("Localizzazione", ["Italia", "Worldwide"], key="as_loc")
+    event     = st.selectbox("Evento di conversione", ["Purchase", "Lead", "CompleteRegistration"], key="as_evt")
+
+    if st.button("🚀 Crea AdSet", key="btn_create_adset"):
+        logging.debug(f"Creating adset: camp={st.session_state.campaign_id}, {as_name!r}, {location}, {event}")
+        try:
+            pix_id = clean_id(sel_pixel)
+            adset_id = create_adset(
+                campaign_id=st.session_state.campaign_id,
+                name=as_name,
+                country="IT" if location == "Italia" else None,
+                pixel_id=pix_id,
+                event=event
+            )
+            logging.debug(f"create_adset returned ID={adset_id}")
+            st.success(f"✅ AdSet creato! ID: {adset_id}")
+            st.session_state.adset_id = adset_id
+        except Exception as e:
+            logging.exception("Errore create_adset")
+            st.error(f"❌ Errore creazione AdSet: {e}")
+            st.text(traceback.format_exc())
+
+# — Debug session state —
+st.sidebar.markdown("---")
+if st.sidebar.button("🔍 Mostra session_state"):
+    st.sidebar.json(dict(st.session_state))
+
+logging.debug("UI load end")
