@@ -18,3 +18,9 @@ if not AD_ACCOUNT_ID:
 PIXEL_ID = os.getenv("PIXEL_ID")
 if not PIXEL_ID:
     raise ValueError("PIXEL_ID mancante in .env")
+
+[credentials]
+# username = "password"
+DanyR   = "Password123"
+luca    = "secret456"
+anna    = "mypassword"
