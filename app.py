@@ -366,6 +366,7 @@ else:
 
 # Utility per montare gli UTM
 import urllib.parse
+# Utility per montare gli UTM
 def build_utm_url(base_url, utm_params):
     parsed = urllib.parse.urlparse(base_url)
     qs = dict(urllib.parse.parse_qsl(parsed.query))
@@ -407,18 +408,20 @@ total = len(files) if files else 0
 # Input: quante creatività per ogni AdSet
 default_per = 1
 if adset_mode == "Usa AdSet esistenti" and files:
-    # suggerisci per uguale distribuzione
-    default_per = math.ceil(total / len(st.session_state.adset_ids_existing))
+    # suggerisci distribuzione equa tra AdSet esistenti
+    existing_count = len(st.session_state.adset_ids_existing)
+    if existing_count > 0:
+        default_per = math.ceil(total / existing_count)
 per_adset = st.number_input(
     "Quante creatività per ogni AdSet?",
     min_value=1,
-    max_value= total if total>0 else 1,
+    max_value= total if total > 0 else 1,
     value=default_per,
     step=1
 )
 
-# Pulsante
-label = "🚀 Aggiungi creatività" if adset_mode=="Usa AdSet esistenti" else "🚀 Invia e distribuisci"
+# Pulsante di invio
+label = "🚀 Aggiungi creatività" if adset_mode == "Usa AdSet esistenti" else "🚀 Invia e distribuisci"
 if st.button(label):
     if not files:
         st.error("🚨 Nessun file caricato.")
@@ -427,12 +430,12 @@ if st.button(label):
         chunks = [files[i:i+per_adset] for i in range(0, total, per_adset)]
         n_chunks = len(chunks)
 
-        # Prepara adset_ids
+        # Prepara lista adset_ids
         adset_ids = []
         if adset_mode == "Usa AdSet esistenti":
             existing = st.session_state.adset_ids_existing
             if n_chunks > len(existing):
-                st.error(f"Hai bisogno di {n_chunks} AdSet ma ne hai solo {len(existing)}. Riduci 'per AdSet' o aggiungi AdSet esistenti.")
+                st.error(f"Hai bisogno di {n_chunks} AdSet ma ne hai solo {len(existing)}. Riduci 'per creatività' o aggiungi AdSet esistenti.")
                 st.stop()
             adset_ids = existing[:n_chunks]
         else:
@@ -508,6 +511,7 @@ if st.button(label):
                         is_video=is_video,
                         thumbnail_hash=thumb_hash
                     )
+
                     # crea ad
                     ad_id = create_ad(
                         ad_account_id=ad_account_id,
@@ -520,7 +524,7 @@ if st.button(label):
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
 
-        # Riepilogo
+        # Riepilogo finale
         st.markdown("**Riepilogo distribuzione:**")
         for a, ads in distribution.items():
             st.write(f"- AdSet {a}: {', '.join([f'{n} (Ad {i})' for n,i in ads])}")
