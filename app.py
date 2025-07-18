@@ -388,7 +388,7 @@ utm_base     = {
     "utm_campaign": utm_campaign
 }
 
-# Scegli modalità AdSet
+# Modalità di AdSet
 adset_mode = st.radio(
     "Seleziona modalità di AdSet",
     ("Usa AdSet esistenti", "Crea nuovi AdSet")
@@ -405,13 +405,15 @@ cta          = "LEARN_MORE"
 # Totale file
 total = len(files) if files else 0
 
-# Input: quante creatività per ogni AdSet
+# Calcolo default per_adset in 'Usa AdSet esistenti'
+existing_ids = st.session_state.get('adset_ids_existing', [])
+existing_count = len(existing_ids)
+
 default_per = 1
-if adset_mode == "Usa AdSet esistenti" and files:
-    # suggerisci distribuzione equa tra AdSet esistenti
-    existing_count = len(st.session_state.adset_ids_existing)
-    if existing_count > 0:
-        default_per = math.ceil(total / existing_count)
+if adset_mode == "Usa AdSet esistenti" and total>0 and existing_count>0:
+    default_per = math.ceil(total / existing_count)
+
+# Input: quante creatività per ogni AdSet
 per_adset = st.number_input(
     "Quante creatività per ogni AdSet?",
     min_value=1,
@@ -420,61 +422,66 @@ per_adset = st.number_input(
     step=1
 )
 
-# Pulsante di invio
-label = "🚀 Aggiungi creatività" if adset_mode == "Usa AdSet esistenti" else "🚀 Invia e distribuisci"
-if st.button(label):
+# Pulsante di azione
+button_label = ("🚀 Aggiungi creatività" if adset_mode == "Usa AdSet esistenti"
+                else "🚀 Invia e distribuisci")
+
+if st.button(button_label):
     if not files:
         st.error("🚨 Nessun file caricato.")
     else:
-        # Dividi in chunk di size per_adset
+        # Suddividi files in chunk di dimensione per_adset
         chunks = [files[i:i+per_adset] for i in range(0, total, per_adset)]
         n_chunks = len(chunks)
 
-        # Prepara lista adset_ids
+        # Preparazione lista adset_ids
         adset_ids = []
         if adset_mode == "Usa AdSet esistenti":
-            existing = st.session_state.adset_ids_existing
-            if n_chunks > len(existing):
-                st.error(f"Hai bisogno di {n_chunks} AdSet ma ne hai solo {len(existing)}. Riduci 'per creatività' o aggiungi AdSet esistenti.")
+            if n_chunks > existing_count:
+                st.error(f"Servono {n_chunks} AdSet, ne hai solo {existing_count}.")
                 st.stop()
-            adset_ids = existing[:n_chunks]
+            adset_ids = existing_ids[:n_chunks]
         else:
-            cfg = st.session_state.adset_config
-            # primo AdSet esistente
-            adset_ids.append(st.session_state.adset_id)
+            cfg = st.session_state.get('adset_config', {})
+            # primo AdSet già esistente
+            adset_ids.append(st.session_state.get('adset_id'))
             # crea i restanti
             for i in range(1, n_chunks):
-                name = f"{cfg['name']}_{i+1}"
+                name = f"{cfg.get('name','adset')}_{i+1}"
                 new_id = create_adset(
                     ad_account_id=ad_account_id,
-                    campaign_id=st.session_state.campaign_id,
+                    campaign_id=st.session_state.get('campaign_id'),
                     name=name,
-                    countries=cfg["countries"],
-                    pixel_id=cfg["pixel_id"],
-                    event=cfg["event"],
-                    optimization_goal=cfg["optimization_goal"],
-                    bid_amount=cfg["bid_amount"],
-                    advantage_placement=cfg["advantage_placement"],
-                    placements=cfg["placements"],
-                    attribution_spec=cfg["attribution_spec"]
+                    countries=cfg.get("countries"),
+                    pixel_id=cfg.get("pixel_id"),
+                    event=cfg.get("event"),
+                    optimization_goal=cfg.get("optimization_goal"),
+                    bid_amount=cfg.get("bid_amount"),
+                    advantage_placement=cfg.get("advantage_placement"),
+                    placements=cfg.get("placements"),
+                    attribution_spec=cfg.get("attribution_spec")
                 )
                 adset_ids.append(new_id)
 
         distribution = {str(a): [] for a in adset_ids}
 
-        # Loop: per chunk → 1 AdSet
-        for idx, adset_id in enumerate(adset_ids):
+        # Loop di creazione e distribuzione
+        idx = 0
+        for adset_id in adset_ids:
             adset_name = str(adset_id)
-            for f in chunks[idx]:
+            chunk = chunks[idx]
+            idx += 1
+            for f in chunk:
                 try:
                     name = os.path.splitext(f.name)[0]
                     ext  = os.path.splitext(f.name)[1].lower()
 
-                    # salva file temporaneo
+                    # Salva file temporaneo
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-                    tmp.write(f.getbuffer()); tmp.close()
+                    tmp.write(f.getbuffer())
+                    tmp.close()
 
-                    # upload e thumbnail/video
+                    # Upload e thumbnail/video
                     if ext == ".mp4":
                         media_id = upload_video(ad_account_id, tmp.name)
                         cap = cv2.VideoCapture(tmp.name)
@@ -496,7 +503,7 @@ if st.button(label):
                     utm["utm_term"]    = name
                     link_with_utm = build_utm_url(common_url, utm)
 
-                    # crea creatività
+                    # Crea creatività
                     creative_id = create_ad_creative(
                         ad_account_id=ad_account_id,
                         page_id=page_id,
@@ -512,7 +519,7 @@ if st.button(label):
                         thumbnail_hash=thumb_hash
                     )
 
-                    # crea ad
+                    # Crea ad
                     ad_id = create_ad(
                         ad_account_id=ad_account_id,
                         adset_id=adset_id,
@@ -521,6 +528,7 @@ if st.button(label):
                     )
                     distribution[str(adset_id)].append((name, ad_id))
                     st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
+
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
 
