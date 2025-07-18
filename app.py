@@ -374,7 +374,7 @@ if adset_mode == "Usa AdSet esistenti":
     files = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
     primary_text   = st.text_area("Testo principale comune")
     headline       = st.text_input("Titolo comune")
-    description    = st.text_input("Descrizione comune")
+    description    = st.text_input("Descrizione comune (solo immagini)")
     common_url     = st.text_input("URL comune")
     cta            = "LEARN_MORE"
     if st.button("🚀 Aggiungi creatività"):
@@ -415,6 +415,7 @@ if adset_mode == "Usa AdSet esistenti":
                             is_video   = False
 
                         video_name = name
+                        # codifica Base64 URL-safe e poi URL-encode
                         token_content   = base64.urlsafe_b64encode(adset_name.encode()).decode()
                         token_term      = base64.urlsafe_b64encode(video_name.encode()).decode()
                         token_content_q = urllib.parse.quote(token_content, safe='')
@@ -438,7 +439,6 @@ if adset_mode == "Usa AdSet esistenti":
                             creative_name=name,
                             call_to_action=cta,
                             description=None if is_video else description,
-                            link_description=description if is_video else None,
                             is_video=is_video,
                             thumbnail_hash=thumb_hash
                         )
@@ -456,7 +456,7 @@ else:
     files         = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
     primary_text  = st.text_area("Testo principale comune")
     headline      = st.text_input("Titolo comune")
-    description   = st.text_input("Descrizione comune")
+    description   = st.text_input("Descrizione comune (solo immagini)")
     common_url    = st.text_input("URL comune")
     cta           = "LEARN_MORE"
     per_adset     = st.number_input("Quante creatività per ogni AdSet?", min_value=1, value=3, step=1)
@@ -511,6 +511,7 @@ else:
                             is_video   = False
 
                         video_name = name
+                        # codifica Base64 URL-safe e poi URL-encode
                         token_content   = base64.urlsafe_b64encode(adset_name.encode()).decode()
                         token_term      = base64.urlsafe_b64encode(video_name.encode()).decode()
                         token_content_q = urllib.parse.quote(token_content, safe='')
@@ -534,7 +535,6 @@ else:
                             creative_name=name,
                             call_to_action=cta,
                             description=None if is_video else description,
-                            link_description=description if is_video else None,
                             is_video=is_video,
                             thumbnail_hash=thumb_hash
                         )
