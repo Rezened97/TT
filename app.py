@@ -366,7 +366,6 @@ else:
 
 # Utility per montare gli UTM
 import urllib.parse
-# Utility per montare gli UTM
 def build_utm_url(base_url, utm_params):
     parsed = urllib.parse.urlparse(base_url)
     qs = dict(urllib.parse.parse_qsl(parsed.query))
@@ -388,14 +387,14 @@ utm_base     = {
     "utm_campaign": utm_campaign
 }
 
-# Modalità AdSet (selezionata dalla sidebar)
-adset_mode = st.session_state.get('adset_mode', 'Usa AdSet esistenti')
+# Modalità di AdSet (da sidebar)
+adset_mode = st.session_state['adset_mode']
 
 # Recupero AdSet esistenti in sessione
 existing_ids = st.session_state.get('adset_ids_existing', [])
 existing_count = len(existing_ids)
 
-# Se non ci sono AdSet esistenti e si richiede 'Usa AdSet esistenti', interrompi
+# Se si usa AdSet esistenti ma non ce ne sono
 if adset_mode == "Usa AdSet esistenti" and existing_count == 0:
     st.warning("Non ci sono AdSet esistenti nella sessione. Cambia modalità nella sidebar.")
     st.stop()
@@ -426,8 +425,7 @@ per_adset = st.number_input(
 )
 
 # Pulsante di azione
-button_label = "🚀 Aggiungi creatività"
-if st.button(button_label):
+if st.button("🚀 Aggiungi creatività"):
     if not files:
         st.error("🚨 Nessun file caricato.")
     else:
@@ -444,9 +442,8 @@ if st.button(button_label):
             adset_ids = existing_ids[:n_chunks]
         else:
             cfg = st.session_state.get('adset_config', {})
-            # primo AdSet esistente
-            first_id = st.session_state.get('adset_id')
-            adset_ids.append(first_id)
+            # primo AdSet già esistente
+            adset_ids.append(st.session_state.get('adset_id'))
             # crea i restanti
             for i in range(1, n_chunks):
                 name = f"{cfg.get('name','adset')}_{i+1}"
@@ -468,8 +465,7 @@ if st.button(button_label):
         distribution = {str(a): [] for a in adset_ids}
 
         # Loop di creazione e distribuzione
-        idx = 0
-        for adset_id in adset_ids:
+        for idx, adset_id in enumerate(adset_ids):
             adset_name = str(adset_id)
             for f in chunks[idx]:
                 try:
@@ -531,15 +527,11 @@ if st.button(button_label):
 
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
-            idx += 1
 
         # Riepilogo finale
         st.markdown("**Riepilogo distribuzione:**")
         for a, ads in distribution.items():
             st.write(f"- AdSet {a}: {', '.join([f'{n} (Ad {i})' for n,i in ads])}")
         st.success(f"Distribuite {total} creatività in {n_chunks} AdSet")
-
-
-
 
 logging.debug("App end")
