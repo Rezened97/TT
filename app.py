@@ -364,174 +364,153 @@ else:
         else:
             st.info("Seleziona almeno un AdSet esistente nella sidebar.")
 
-# Utility per montare gli UTM
-import urllib.parse
-def build_utm_url(base_url, utm_params):
-    parsed = urllib.parse.urlparse(base_url)
-    qs = dict(urllib.parse.parse_qsl(parsed.query))
-    qs.update({k: v for k, v in utm_params.items() if v})
-    new_query = urllib.parse.urlencode(qs)
-    return urllib.parse.urlunparse(parsed._replace(query=new_query))
-
 # ——— 3) Bulk Creatività ———
 st.markdown("---")
 st.header("🎨 3) Crea creatività e distribuisci")
-
-# Parametri UTM automatici
-utm_source   = "newsletter"
-utm_medium   = "email"
-utm_campaign = "summer_sale"
-utm_base     = {
-    "utm_source":   utm_source,
-    "utm_medium":   utm_medium,
-    "utm_campaign": utm_campaign
-}
-
-# Modalità di AdSet (da sidebar)
-adset_mode = st.session_state['adset_mode']
-
-# Recupero AdSet esistenti in sessione
-existing_ids = st.session_state.get('adset_ids_existing', [])
-existing_count = len(existing_ids)
-
-# Se si usa AdSet esistenti ma non ce ne sono
-if adset_mode == "Usa AdSet esistenti" and existing_count == 0:
-    st.warning("Non ci sono AdSet esistenti nella sessione. Cambia modalità nella sidebar.")
-    st.stop()
-
-# Caricamento file e campi comuni
-files        = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
-primary_text = st.text_area("Testo principale comune")
-headline     = st.text_input("Titolo comune")
-description  = st.text_input("Descrizione comune (solo immagini)")
-common_url   = st.text_input("URL comune")
-cta          = "LEARN_MORE"
-
-# Totale file
-total = len(files) if files else 0
-
-# Calcolo default per_adset
-default_per = 1
-if adset_mode == "Usa AdSet esistenti" and total > 0 and existing_count > 0:
-    default_per = math.ceil(total / existing_count)
-
-# Input: quante creatività per ogni AdSet
-per_adset = st.number_input(
-    "Quante creatività per ogni AdSet?",
-    min_value=1,
-    max_value= total if total > 0 else 1,
-    value=default_per,
-    step=1
-)
-
-# Pulsante di azione
-if st.button("🚀 Aggiungi creatività"):
-    if not files:
-        st.error("🚨 Nessun file caricato.")
-    else:
-        # Suddividi files in chunk di dimensione per_adset
-        chunks = [files[i:i+per_adset] for i in range(0, total, per_adset)]
-        n_chunks = len(chunks)
-
-        # Preparazione lista adset_ids
-        adset_ids = []
-        if adset_mode == "Usa AdSet esistenti":
-            if n_chunks > existing_count:
-                st.error(f"Servono {n_chunks} AdSet, ne hai solo {existing_count}. Riduci 'per creatività'.")
-                st.stop()
-            adset_ids = existing_ids[:n_chunks]
+if adset_mode == "Usa AdSet esistenti":
+    files = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
+    primary_text = st.text_area("Testo principale comune")
+    headline     = st.text_input("Titolo comune")
+    description  = st.text_input("Descrizione comune (solo immagini)")
+    common_url   = st.text_input("URL comune")
+    cta          = "LEARN_MORE"
+    if st.button("🚀 Aggiungi creatività"):
+        if not files:
+            st.error("🚨 Nessun file caricato.")
         else:
-            cfg = st.session_state.get('adset_config', {})
-            # primo AdSet già esistente
-            adset_ids.append(st.session_state.get('adset_id'))
-            # crea i restanti
-            for i in range(1, n_chunks):
-                name = f"{cfg.get('name','adset')}_{i+1}"
-                new_id = create_adset(
-                    ad_account_id=ad_account_id,
-                    campaign_id=st.session_state.get('campaign_id'),
-                    name=name,
-                    countries=cfg.get("countries"),
-                    pixel_id=cfg.get("pixel_id"),
-                    event=cfg.get("event"),
-                    optimization_goal=cfg.get("optimization_goal"),
-                    bid_amount=cfg.get("bid_amount"),
-                    advantage_placement=cfg.get("advantage_placement"),
-                    placements=cfg.get("placements"),
-                    attribution_spec=cfg.get("attribution_spec")
-                )
-                adset_ids.append(new_id)
+            adset_ids = st.session_state.adset_ids_existing
+            total     = len(files)
+            m         = len(adset_ids)
+            base      = total // m
+            rem       = total % m
+            sizes     = [base + (1 if i < rem else 0) for i in range(m)]
+            idx       = 0
+            for i, adset_id in enumerate(adset_ids):
+                chunk = files[idx: idx + sizes[i]]
+                idx  += sizes[i]
+                for f in chunk:
+                    try:
+                        name = os.path.splitext(f.name)[0]
+                        ext  = os.path.splitext(f.name)[1].lower()
+                        tmp  = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                        tmp.write(f.getbuffer()); tmp.close()
+                        if ext == ".mp4":
+                            media_id = upload_video(ad_account_id, tmp.name)
+                            cap      = cv2.VideoCapture(tmp.name)
+                            ok, frame = cap.read(); cap.release()
+                            if not ok:
+                                raise Exception("Impossibile estrarre frame")
+                            tmp_th     = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                            cv2.imwrite(tmp_th.name, frame)
+                            thumb_hash = upload_image(ad_account_id, tmp_th.name)
+                            is_video   = True
+                        else:
+                            thumb_hash = None
+                            media_id   = upload_image(ad_account_id, tmp.name)
+                            is_video   = False
 
-        distribution = {str(a): [] for a in adset_ids}
-
-        # Loop di creazione e distribuzione
-        for idx, adset_id in enumerate(adset_ids):
-            adset_name = str(adset_id)
-            for f in chunks[idx]:
-                try:
-                    name = os.path.splitext(f.name)[0]
-                    ext  = os.path.splitext(f.name)[1].lower()
-
-                    # Salva file temporaneo
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-                    tmp.write(f.getbuffer())
-                    tmp.close()
-
-                    # Upload e thumbnail/video
-                    if ext == ".mp4":
-                        media_id = upload_video(ad_account_id, tmp.name)
-                        cap = cv2.VideoCapture(tmp.name)
-                        ok, frame = cap.read(); cap.release()
-                        if not ok:
-                            raise Exception("Impossibile estrarre frame")
-                        tmp_th = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-                        cv2.imwrite(tmp_th.name, frame)
-                        thumb_hash = upload_image(ad_account_id, tmp_th.name)
-                        is_video = True
-                    else:
-                        media_id   = upload_image(ad_account_id, tmp.name)
-                        thumb_hash = None
-                        is_video   = False
-
-                    # UTM dinamici
-                    utm = utm_base.copy()
-                    utm["utm_content"] = adset_name
-                    utm["utm_term"]    = name
-                    link_with_utm = build_utm_url(common_url, utm)
-
-                    # Crea creatività
-                    creative_id = create_ad_creative(
+                        creative_id = create_ad_creative(
+                            ad_account_id=ad_account_id,
+                            page_id=page_id,
+                            page_token=page_token,
+                            media_id=media_id,
+                            primary_text=primary_text,
+                            headline=headline,
+                            link_url=common_url,
+                            creative_name=name,
+                            call_to_action=cta,
+                            description=None if is_video else description,
+                            is_video=is_video,
+                            thumbnail_hash=thumb_hash
+                        )
+                        ad_id = create_ad(
+                            ad_account_id=ad_account_id,
+                            adset_id=adset_id,
+                            creative_id=creative_id,
+                            name=name
+                        )
+                        st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
+                    except Exception as e:
+                        st.error(f"{f.name}: {e}")
+            st.success(f"Tutte le {total} creatività aggiunte su {m} AdSet")
+else:
+    files      = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
+    primary_text = st.text_area("Testo principale comune")
+    headline     = st.text_input("Titolo comune")
+    description  = st.text_input("Descrizione comune (solo immagini)")
+    common_url   = st.text_input("URL comune")
+    cta          = "LEARN_MORE"
+    per_adset    = st.number_input("Quante creatività per ogni AdSet?", min_value=1, value=3, step=1)
+    if st.button("🚀 Invia e distribuisci"):
+        if not files:
+            st.error("🚨 Nessun file caricato.")
+        else:
+            chunks        = [files[i:i+per_adset] for i in range(0, len(files), per_adset)]
+            all_adset_ids = []
+            for idx, chunk in enumerate(chunks):
+                if idx == 0:
+                    adset_id = st.session_state.adset_id
+                else:
+                    cfg      = st.session_state.adset_config
+                    new_name = f"{cfg['name']}_{idx+1}"
+                    adset_id = create_adset(
                         ad_account_id=ad_account_id,
-                        page_id=page_id,
-                        page_token=page_token,
-                        media_id=media_id,
-                        primary_text=primary_text,
-                        headline=headline,
-                        link_url=link_with_utm,
-                        creative_name=name,
-                        call_to_action=cta,
-                        description=None if is_video else description,
-                        is_video=is_video,
-                        thumbnail_hash=thumb_hash
+                        campaign_id=st.session_state.campaign_id,
+                        name=new_name,
+                        countries=cfg["countries"],
+                        pixel_id=cfg["pixel_id"],
+                        event=cfg["event"],
+                        optimization_goal=cfg["optimization_goal"],
+                        bid_amount=cfg["bid_amount"],
+                        advantage_placement=cfg["advantage_placement"],
+                        placements=cfg["placements"],
+                        attribution_spec=cfg["attribution_spec"]
                     )
+                all_adset_ids.append(adset_id)
+                for f in chunk:
+                    try:
+                        name = os.path.splitext(f.name)[0]
+                        ext  = os.path.splitext(f.name)[1].lower()
+                        tmp  = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                        tmp.write(f.getbuffer()); tmp.close()
+                        if ext == ".mp4":
+                            media_id = upload_video(ad_account_id, tmp.name)
+                            cap      = cv2.VideoCapture(tmp.name)
+                            ok, frame = cap.read(); cap.release()
+                            if not ok:
+                                raise Exception("Impossibile estrarre frame")
+                            tmp_th     = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                            cv2.imwrite(tmp_th.name, frame)
+                            thumb_hash = upload_image(ad_account_id, tmp_th.name)
+                            is_video   = True
+                        else:
+                            thumb_hash = None
+                            media_id   = upload_image(ad_account_id, tmp.name)
+                            is_video   = False
 
-                    # Crea ad
-                    ad_id = create_ad(
-                        ad_account_id=ad_account_id,
-                        adset_id=adset_id,
-                        creative_id=creative_id,
-                        name=name
-                    )
-                    distribution[str(adset_id)].append((name, ad_id))
-                    st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
-
-                except Exception as e:
-                    st.error(f"{f.name}: {e}")
-
-        # Riepilogo finale
-        st.markdown("**Riepilogo distribuzione:**")
-        for a, ads in distribution.items():
-            st.write(f"- AdSet {a}: {', '.join([f'{n} (Ad {i})' for n,i in ads])}")
-        st.success(f"Distribuite {total} creatività in {n_chunks} AdSet")
+                        creative_id = create_ad_creative(
+                            ad_account_id=ad_account_id,
+                            page_id=page_id,
+                            page_token=page_token,
+                            media_id=media_id,
+                            primary_text=primary_text,
+                            headline=headline,
+                            link_url=common_url,
+                            creative_name=name,
+                            call_to_action=cta,
+                            description=None if is_video else description,
+                            is_video=is_video,
+                            thumbnail_hash=thumb_hash
+                        )
+                        ad_id = create_ad(
+                            ad_account_id=ad_account_id,
+                            adset_id=adset_id,
+                            creative_id=creative_id,
+                            name=name
+                        )
+                        st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
+                    except Exception as e:
+                        st.error(f"{f.name}: {e}")
+            st.success(f"Tutti i file distribuiti in {len(all_adset_ids)} AdSet")
 
 logging.debug("App end")
