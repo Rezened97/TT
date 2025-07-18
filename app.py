@@ -381,13 +381,13 @@ st.header("🎨 3) Crea creatività e distribuisci")
 utm_source   = "newsletter"
 utm_medium   = "email"
 utm_campaign = "summer_sale"
-utm_base = {
+utm_base     = {
     "utm_source":   utm_source,
     "utm_medium":   utm_medium,
     "utm_campaign": utm_campaign
 }
 
-# Selezione modalità AdSet
+# Scegli modalità AdSet
 adset_mode = st.radio(
     "Seleziona modalità di AdSet",
     ("Usa AdSet esistenti", "Crea nuovi AdSet")
@@ -401,47 +401,51 @@ description  = st.text_input("Descrizione comune (solo immagini)")
 common_url   = st.text_input("URL comune")
 cta          = "LEARN_MORE"
 
-# Calcola totale e default di AdSet
+# Totale file
 total = len(files) if files else 0
-if adset_mode == "Usa AdSet esistenti":
-    default_n = min(len(st.session_state.adset_ids_existing), total) if total>0 else 1
-else:
-    default_n = 1
 
-# Scegli in quanti AdSet distribuire
-n_adsets = st.number_input(
-    "Numero di AdSet da usare",
+# Input: quante creatività per ogni AdSet
+default_per = 1
+if adset_mode == "Usa AdSet esistenti" and files:
+    # suggerisci per uguale distribuzione
+    default_per = math.ceil(total / len(st.session_state.adset_ids_existing))
+per_adset = st.number_input(
+    "Quante creatività per ogni AdSet?",
     min_value=1,
     max_value= total if total>0 else 1,
-    value=default_n,
+    value=default_per,
     step=1
 )
 
-# Pulsante di invio
-action_label = "🚀 Aggiungi creatività" if adset_mode=="Usa AdSet esistenti" else "🚀 Invia e distribuisci"
-if st.button(action_label):
+# Pulsante
+label = "🚀 Aggiungi creatività" if adset_mode=="Usa AdSet esistenti" else "🚀 Invia e distribuisci"
+if st.button(label):
     if not files:
         st.error("🚨 Nessun file caricato.")
     else:
-        # Divisione equa dei file
-        base = total // n_adsets
-        rem  = total % n_adsets
-        sizes = [base + (1 if i<rem else 0) for i in range(n_adsets)]
-        idx = 0
+        # Dividi in chunk di size per_adset
+        chunks = [files[i:i+per_adset] for i in range(0, total, per_adset)]
+        n_chunks = len(chunks)
 
-        # Prepara lista adset_ids
+        # Prepara adset_ids
         adset_ids = []
         if adset_mode == "Usa AdSet esistenti":
-            adset_ids = st.session_state.adset_ids_existing[:n_adsets]
+            existing = st.session_state.adset_ids_existing
+            if n_chunks > len(existing):
+                st.error(f"Hai bisogno di {n_chunks} AdSet ma ne hai solo {len(existing)}. Riduci 'per AdSet' o aggiungi AdSet esistenti.")
+                st.stop()
+            adset_ids = existing[:n_chunks]
         else:
             cfg = st.session_state.adset_config
+            # primo AdSet esistente
             adset_ids.append(st.session_state.adset_id)
-            for i in range(1, n_adsets):
-                new_name = f"{cfg['name']}_{i+1}"
+            # crea i restanti
+            for i in range(1, n_chunks):
+                name = f"{cfg['name']}_{i+1}"
                 new_id = create_adset(
                     ad_account_id=ad_account_id,
                     campaign_id=st.session_state.campaign_id,
-                    name=new_name,
+                    name=name,
                     countries=cfg["countries"],
                     pixel_id=cfg["pixel_id"],
                     event=cfg["event"],
@@ -455,26 +459,23 @@ if st.button(action_label):
 
         distribution = {str(a): [] for a in adset_ids}
 
-        # Loop di creazione e distribuzione
-        for i, adset_id in enumerate(adset_ids):
+        # Loop: per chunk → 1 AdSet
+        for idx, adset_id in enumerate(adset_ids):
             adset_name = str(adset_id)
-            chunk = files[idx: idx + sizes[i]]
-            idx += sizes[i]
-
-            for f in chunk:
+            for f in chunks[idx]:
                 try:
                     name = os.path.splitext(f.name)[0]
                     ext  = os.path.splitext(f.name)[1].lower()
-                    tmp  = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-                    tmp.write(f.getbuffer())
-                    tmp.close()
 
-                    # Upload e thumbnail/video
+                    # salva file temporaneo
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                    tmp.write(f.getbuffer()); tmp.close()
+
+                    # upload e thumbnail/video
                     if ext == ".mp4":
                         media_id = upload_video(ad_account_id, tmp.name)
                         cap = cv2.VideoCapture(tmp.name)
-                        ok, frame = cap.read()
-                        cap.release()
+                        ok, frame = cap.read(); cap.release()
                         if not ok:
                             raise Exception("Impossibile estrarre frame")
                         tmp_th = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
@@ -492,7 +493,7 @@ if st.button(action_label):
                     utm["utm_term"]    = name
                     link_with_utm = build_utm_url(common_url, utm)
 
-                    # Crea creatività
+                    # crea creatività
                     creative_id = create_ad_creative(
                         ad_account_id=ad_account_id,
                         page_id=page_id,
@@ -507,8 +508,7 @@ if st.button(action_label):
                         is_video=is_video,
                         thumbnail_hash=thumb_hash
                     )
-
-                    # Crea ad
+                    # crea ad
                     ad_id = create_ad(
                         ad_account_id=ad_account_id,
                         adset_id=adset_id,
@@ -517,15 +517,15 @@ if st.button(action_label):
                     )
                     distribution[str(adset_id)].append((name, ad_id))
                     st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
-
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
 
-        # Riepilogo finale
+        # Riepilogo
         st.markdown("**Riepilogo distribuzione:**")
         for a, ads in distribution.items():
             st.write(f"- AdSet {a}: {', '.join([f'{n} (Ad {i})' for n,i in ads])}")
-        st.success(f"Distribuite {total} creatività in {n_adsets} AdSet")
+        st.success(f"Distribuite {total} creatività in {n_chunks} AdSet")
+
 
 
 logging.debug("App end")
