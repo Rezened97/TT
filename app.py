@@ -364,6 +364,8 @@ else:
         else:
             st.info("Seleziona almeno un AdSet esistente nella sidebar.")
 
+import urllib.parse
+
 # ——— 3) Bulk Creatività ———
 st.markdown("---")
 st.header("🎨 3) Crea creatività e distribuisci")
@@ -378,16 +380,18 @@ if adset_mode == "Usa AdSet esistenti":
         if not files:
             st.error("🚨 Nessun file caricato.")
         else:
-            adset_ids = st.session_state.adset_ids_existing
-            total     = len(files)
-            m         = len(adset_ids)
-            base      = total // m
-            rem       = total % m
-            sizes     = [base + (1 if i < rem else 0) for i in range(m)]
-            idx       = 0
+            adset_ids   = st.session_state.adset_ids_existing
+            adset_names = st.session_state.adset_names_existing
+            total       = len(files)
+            m           = len(adset_ids)
+            base        = total // m
+            rem         = total % m
+            sizes       = [base + (1 if i < rem else 0) for i in range(m)]
+            idx         = 0
             for i, adset_id in enumerate(adset_ids):
                 chunk = files[idx: idx + sizes[i]]
                 idx  += sizes[i]
+                adset_name = adset_names[i]
                 for f in chunk:
                     try:
                         name = os.path.splitext(f.name)[0]
@@ -409,6 +413,14 @@ if adset_mode == "Usa AdSet esistenti":
                             media_id   = upload_image(ad_account_id, tmp.name)
                             is_video   = False
 
+                        video_name = name
+                        sep = "?" if "?" not in common_url else "&"
+                        link_url = (
+                            f"{common_url}"
+                            f"{sep}utm_content={urllib.parse.quote(adset_name)}"
+                            f"&utm_term={urllib.parse.quote(video_name)}"
+                        )
+
                         creative_id = create_ad_creative(
                             ad_account_id=ad_account_id,
                             page_id=page_id,
@@ -416,7 +428,7 @@ if adset_mode == "Usa AdSet esistenti":
                             media_id=media_id,
                             primary_text=primary_text,
                             headline=headline,
-                            link_url=common_url,
+                            link_url=link_url,
                             creative_name=name,
                             call_to_action=cta,
                             description=None if is_video else description,
@@ -434,7 +446,7 @@ if adset_mode == "Usa AdSet esistenti":
                         st.error(f"{f.name}: {e}")
             st.success(f"Tutte le {total} creatività aggiunte su {m} AdSet")
 else:
-    files      = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
+    files       = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
     primary_text = st.text_area("Testo principale comune")
     headline     = st.text_input("Titolo comune")
     description  = st.text_input("Descrizione comune (solo immagini)")
@@ -449,11 +461,12 @@ else:
             all_adset_ids = []
             for idx, chunk in enumerate(chunks):
                 if idx == 0:
-                    adset_id = st.session_state.adset_id
+                    adset_id   = st.session_state.adset_id
+                    adset_name = st.session_state.adset_config["name"]
                 else:
-                    cfg      = st.session_state.adset_config
-                    new_name = f"{cfg['name']}_{idx+1}"
-                    adset_id = create_adset(
+                    cfg       = st.session_state.adset_config
+                    new_name  = f"{cfg['name']}_{idx+1}"
+                    adset_id  = create_adset(
                         ad_account_id=ad_account_id,
                         campaign_id=st.session_state.campaign_id,
                         name=new_name,
@@ -467,6 +480,7 @@ else:
                         placements=cfg["placements"],
                         attribution_spec=cfg["attribution_spec"]
                     )
+                    adset_name = new_name
                 all_adset_ids.append(adset_id)
                 for f in chunk:
                     try:
@@ -489,6 +503,14 @@ else:
                             media_id   = upload_image(ad_account_id, tmp.name)
                             is_video   = False
 
+                        video_name = name
+                        sep = "?" if "?" not in common_url else "&"
+                        link_url = (
+                            f"{common_url}"
+                            f"{sep}utm_content={urllib.parse.quote(adset_name)}"
+                            f"&utm_term={urllib.parse.quote(video_name)}"
+                        )
+
                         creative_id = create_ad_creative(
                             ad_account_id=ad_account_id,
                             page_id=page_id,
@@ -496,7 +518,7 @@ else:
                             media_id=media_id,
                             primary_text=primary_text,
                             headline=headline,
-                            link_url=common_url,
+                            link_url=link_url,
                             creative_name=name,
                             call_to_action=cta,
                             description=None if is_video else description,
@@ -513,5 +535,6 @@ else:
                     except Exception as e:
                         st.error(f"{f.name}: {e}")
             st.success(f"Tutti i file distribuiti in {len(all_adset_ids)} AdSet")
+
 
 logging.debug("App end")
