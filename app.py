@@ -388,11 +388,17 @@ utm_base     = {
     "utm_campaign": utm_campaign
 }
 
-# Modalità di AdSet
-adset_mode = st.radio(
-    "Seleziona modalità di AdSet",
-    ("Usa AdSet esistenti", "Crea nuovi AdSet")
-)
+# Modalità AdSet (selezionata dalla sidebar)
+adset_mode = st.session_state.get('adset_mode', 'Usa AdSet esistenti')
+
+# Recupero AdSet esistenti in sessione
+existing_ids = st.session_state.get('adset_ids_existing', [])
+existing_count = len(existing_ids)
+
+# Se non ci sono AdSet esistenti e si richiede 'Usa AdSet esistenti', interrompi
+if adset_mode == "Usa AdSet esistenti" and existing_count == 0:
+    st.warning("Non ci sono AdSet esistenti nella sessione. Cambia modalità nella sidebar.")
+    st.stop()
 
 # Caricamento file e campi comuni
 files        = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
@@ -405,12 +411,9 @@ cta          = "LEARN_MORE"
 # Totale file
 total = len(files) if files else 0
 
-# Calcolo default per_adset in 'Usa AdSet esistenti'
-existing_ids = st.session_state.get('adset_ids_existing', [])
-existing_count = len(existing_ids)
-
+# Calcolo default per_adset
 default_per = 1
-if adset_mode == "Usa AdSet esistenti" and total>0 and existing_count>0:
+if adset_mode == "Usa AdSet esistenti" and total > 0 and existing_count > 0:
     default_per = math.ceil(total / existing_count)
 
 # Input: quante creatività per ogni AdSet
@@ -423,9 +426,7 @@ per_adset = st.number_input(
 )
 
 # Pulsante di azione
-button_label = ("🚀 Aggiungi creatività" if adset_mode == "Usa AdSet esistenti"
-                else "🚀 Invia e distribuisci")
-
+button_label = "🚀 Aggiungi creatività"
 if st.button(button_label):
     if not files:
         st.error("🚨 Nessun file caricato.")
@@ -438,13 +439,14 @@ if st.button(button_label):
         adset_ids = []
         if adset_mode == "Usa AdSet esistenti":
             if n_chunks > existing_count:
-                st.error(f"Servono {n_chunks} AdSet, ne hai solo {existing_count}.")
+                st.error(f"Servono {n_chunks} AdSet, ne hai solo {existing_count}. Riduci 'per creatività'.")
                 st.stop()
             adset_ids = existing_ids[:n_chunks]
         else:
             cfg = st.session_state.get('adset_config', {})
-            # primo AdSet già esistente
-            adset_ids.append(st.session_state.get('adset_id'))
+            # primo AdSet esistente
+            first_id = st.session_state.get('adset_id')
+            adset_ids.append(first_id)
             # crea i restanti
             for i in range(1, n_chunks):
                 name = f"{cfg.get('name','adset')}_{i+1}"
@@ -469,9 +471,7 @@ if st.button(button_label):
         idx = 0
         for adset_id in adset_ids:
             adset_name = str(adset_id)
-            chunk = chunks[idx]
-            idx += 1
-            for f in chunk:
+            for f in chunks[idx]:
                 try:
                     name = os.path.splitext(f.name)[0]
                     ext  = os.path.splitext(f.name)[1].lower()
@@ -531,12 +531,14 @@ if st.button(button_label):
 
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
+            idx += 1
 
         # Riepilogo finale
         st.markdown("**Riepilogo distribuzione:**")
         for a, ads in distribution.items():
             st.write(f"- AdSet {a}: {', '.join([f'{n} (Ad {i})' for n,i in ads])}")
         st.success(f"Distribuite {total} creatività in {n_chunks} AdSet")
+
 
 
 
