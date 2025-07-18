@@ -12,7 +12,6 @@ import tempfile
 import cv2
 import logging
 import traceback
-import base64
 
 import streamlit as st
 import streamlit_authenticator as stauth
@@ -365,6 +364,7 @@ else:
         else:
             st.info("Seleziona almeno un AdSet esistente nella sidebar.")
 
+import base64
 import urllib.parse
 
 # ——— 3) Bulk Creatività ———
@@ -372,26 +372,26 @@ st.markdown("---")
 st.header("🎨 3) Crea creatività e distribuisci")
 if adset_mode == "Usa AdSet esistenti":
     files = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
-    primary_text = st.text_area("Testo principale comune")
-    headline     = st.text_input("Titolo comune")
-    description  = st.text_input("Descrizione comune (solo immagini)")
-    common_url   = st.text_input("URL comune")
-    cta          = "LEARN_MORE"
+    primary_text   = st.text_area("Testo principale comune")
+    headline       = st.text_input("Titolo comune")
+    description    = st.text_input("Descrizione comune (solo immagini)")
+    common_url     = st.text_input("URL comune")
+    cta            = "LEARN_MORE"
     if st.button("🚀 Aggiungi creatività"):
         if not files:
             st.error("🚨 Nessun file caricato.")
         else:
-            adset_ids   = st.session_state.adset_ids_existing
-            adset_names = st.session_state.adset_names_existing
-            total       = len(files)
-            m           = len(adset_ids)
-            base        = total // m
-            rem         = total % m
-            sizes       = [base + (1 if i < rem else 0) for i in range(m)]
-            idx         = 0
+            adset_ids     = st.session_state.adset_ids_existing
+            adset_names   = st.session_state.adset_names_existing
+            total         = len(files)
+            m             = len(adset_ids)
+            base          = total // m
+            rem           = total % m
+            sizes         = [base + (1 if i < rem else 0) for i in range(m)]
+            idx           = 0
             for i, adset_id in enumerate(adset_ids):
-                chunk = files[idx: idx + sizes[i]]
-                idx  += sizes[i]
+                chunk      = files[idx: idx + sizes[i]]
+                idx       += sizes[i]
                 adset_name = adset_names[i]
                 for f in chunk:
                     try:
@@ -415,17 +415,19 @@ if adset_mode == "Usa AdSet esistenti":
                             is_video   = False
 
                         video_name = name
-                        
-                        token_content = base64.urlsafe_b64encode(adset_name.encode()).decode()
-                        token_term    = base64.urlsafe_b64encode(video_name.encode()).decode()
-                        
+                        # codifica Base64 URL-safe e poi URL-encode
+                        token_content   = base64.urlsafe_b64encode(adset_name.encode()).decode()
+                        token_term      = base64.urlsafe_b64encode(video_name.encode()).decode()
+                        token_content_q = urllib.parse.quote(token_content, safe='')
+                        token_term_q    = urllib.parse.quote(token_term, safe='')
+
                         sep = "?" if "?" not in common_url else "&"
                         link_url = (
                             f"{common_url}"
-                            f"{sep}utm_content={token_content}"
-                            f"&utm_term={token_term}"
+                            f"{sep}utm_content={token_content_q}"
+                            f"&utm_term={token_term_q}"
                         )
-                        
+
                         creative_id = create_ad_creative(
                             ad_account_id=ad_account_id,
                             page_id=page_id,
@@ -451,13 +453,13 @@ if adset_mode == "Usa AdSet esistenti":
                         st.error(f"{f.name}: {e}")
             st.success(f"Tutte le {total} creatività aggiunte su {m} AdSet")
 else:
-    files       = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
-    primary_text = st.text_area("Testo principale comune")
-    headline     = st.text_input("Titolo comune")
-    description  = st.text_input("Descrizione comune (solo immagini)")
-    common_url   = st.text_input("URL comune")
-    cta          = "LEARN_MORE"
-    per_adset    = st.number_input("Quante creatività per ogni AdSet?", min_value=1, value=3, step=1)
+    files         = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
+    primary_text  = st.text_area("Testo principale comune")
+    headline      = st.text_input("Titolo comune")
+    description   = st.text_input("Descrizione comune (solo immagini)")
+    common_url    = st.text_input("URL comune")
+    cta           = "LEARN_MORE"
+    per_adset     = st.number_input("Quante creatività per ogni AdSet?", min_value=1, value=3, step=1)
     if st.button("🚀 Invia e distribuisci"):
         if not files:
             st.error("🚨 Nessun file caricato.")
@@ -469,9 +471,9 @@ else:
                     adset_id   = st.session_state.adset_id
                     adset_name = st.session_state.adset_config["name"]
                 else:
-                    cfg       = st.session_state.adset_config
-                    new_name  = f"{cfg['name']}_{idx+1}"
-                    adset_id  = create_adset(
+                    cfg        = st.session_state.adset_config
+                    new_name   = f"{cfg['name']}_{idx+1}"
+                    adset_id   = create_adset(
                         ad_account_id=ad_account_id,
                         campaign_id=st.session_state.campaign_id,
                         name=new_name,
@@ -509,17 +511,19 @@ else:
                             is_video   = False
 
                         video_name = name
-                        
-                        token_content = base64.urlsafe_b64encode(adset_name.encode()).decode()
-                        token_term    = base64.urlsafe_b64encode(video_name.encode()).decode()
-                        
+                        # codifica Base64 URL-safe e poi URL-encode
+                        token_content   = base64.urlsafe_b64encode(adset_name.encode()).decode()
+                        token_term      = base64.urlsafe_b64encode(video_name.encode()).decode()
+                        token_content_q = urllib.parse.quote(token_content, safe='')
+                        token_term_q    = urllib.parse.quote(token_term, safe='')
+
                         sep = "?" if "?" not in common_url else "&"
                         link_url = (
                             f"{common_url}"
-                            f"{sep}utm_content={urllib.parse.quote(adset_name)}"
-                            f"&utm_term={urllib.parse.quote(video_name)}"
+                            f"{sep}utm_content={token_content_q}"
+                            f"&utm_term={token_term_q}"
                         )
-                        
+
                         creative_id = create_ad_creative(
                             ad_account_id=ad_account_id,
                             page_id=page_id,
