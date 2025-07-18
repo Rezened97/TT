@@ -458,6 +458,7 @@ else:
                         campaign_id=st.session_state.campaign_id,
                         name=new_name,
                         countries=cfg["countries"],
+                        excluded_countries=cfg["excluded_countries"],
                         pixel_id=cfg["pixel_id"],
                         event=cfg["event"],
                         optimization_goal=cfg["optimization_goal"],
