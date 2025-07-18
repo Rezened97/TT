@@ -12,6 +12,7 @@ import tempfile
 import cv2
 import logging
 import traceback
+import base64
 
 import streamlit as st
 import streamlit_authenticator as stauth
@@ -414,13 +415,17 @@ if adset_mode == "Usa AdSet esistenti":
                             is_video   = False
 
                         video_name = name
+                        
+                        token_content = base64.urlsafe_b64encode(adset_name.encode()).decode()
+                        token_term    = base64.urlsafe_b64encode(video_name.encode()).decode()
+                        
                         sep = "?" if "?" not in common_url else "&"
                         link_url = (
                             f"{common_url}"
-                            f"{sep}utm_content={urllib.parse.quote(adset_name)}"
-                            f"&utm_term={urllib.parse.quote(video_name)}"
+                            f"{sep}utm_content={token_content}"
+                            f"&utm_term={token_term}"
                         )
-
+                        
                         creative_id = create_ad_creative(
                             ad_account_id=ad_account_id,
                             page_id=page_id,
