@@ -437,7 +437,8 @@ if adset_mode == "Usa AdSet esistenti":
                             link_url=link_url,
                             creative_name=name,
                             call_to_action=cta,
-                            description=description,
+                            description=None if is_video else description,
+                            link_description=description if is_video else None,
                             is_video=is_video,
                             thumbnail_hash=thumb_hash
                         )
@@ -532,7 +533,8 @@ else:
                             link_url=link_url,
                             creative_name=name,
                             call_to_action=cta,
-                            description=description,
+                            description=None if is_video else description,
+                            link_description=description if is_video else None,
                             is_video=is_video,
                             thumbnail_hash=thumb_hash
                         )
