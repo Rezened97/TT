@@ -379,9 +379,9 @@ st.markdown("---")
 st.header("🎨 3) Crea creatività e distribuisci")
 
 # Input UTM fissi
-utm_source   = st.text_input("utm_source",   value="newsletter")
-utm_medium   = st.text_input("utm_medium",   value="email")
-utm_campaign = st.text_input("utm_campaign", value="summer_sale")
+utm_source   = st.text("utm_source",   value="newsletter")
+utm_medium   = st.text("utm_medium",   value="email")
+utm_campaign = st.text("utm_campaign", value="summer_sale")
 utm_base = {
     "utm_source":   utm_source,
     "utm_medium":   utm_medium,
