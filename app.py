@@ -516,8 +516,8 @@ else:
                         sep = "?" if "?" not in common_url else "&"
                         link_url = (
                             f"{common_url}"
-                            f"{sep}utm_content={token_content}"
-                            f"&utm_term={token_term}"
+                            f"{sep}utm_content={urllib.parse.quote(adset_name)}"
+                            f"&utm_term={urllib.parse.quote(video_name)}"
                         )
                         
                         creative_id = create_ad_creative(
