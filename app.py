@@ -365,8 +365,13 @@ else:
             st.info("Seleziona almeno un AdSet esistente nella sidebar.")
 
 
+import os
+import tempfile
 import urllib.parse
+import cv2
+import streamlit as st
 
+# Utility per montare gli UTM
 def build_utm_url(base_url, utm_params):
     parsed = urllib.parse.urlparse(base_url)
     qs = dict(urllib.parse.parse_qsl(parsed.query))
@@ -382,8 +387,6 @@ st.header("🎨 3) Crea creatività e distribuisci")
 utm_source   = st.text_input("utm_source",   value="newsletter")
 utm_medium   = st.text_input("utm_medium",   value="email")
 utm_campaign = st.text_input("utm_campaign", value="summer_sale")
-
-# dict di base
 utm_base = {
     "utm_source":   utm_source,
     "utm_medium":   utm_medium,
@@ -391,12 +394,12 @@ utm_base = {
 }
 
 if adset_mode == "Usa AdSet esistenti":
-    files       = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
+    files        = st.file_uploader("Carica file (jpg/png/mp4)", type=["jpg","jpeg","png","mp4"], accept_multiple_files=True)
     primary_text = st.text_area("Testo principale comune")
     headline     = st.text_input("Titolo comune")
     description  = st.text_input("Descrizione comune (solo immagini)")
     common_url   = st.text_input("URL comune")
-    cta           = "LEARN_MORE"
+    cta          = "LEARN_MORE"
 
     if st.button("🚀 Aggiungi creatività"):
         if not files:
@@ -407,17 +410,37 @@ if adset_mode == "Usa AdSet esistenti":
             m         = len(adset_ids)
             sizes     = [(total // m) + (1 if i < total % m else 0) for i in range(m)]
             idx       = 0
-            for i, adset_id in enumerate(adset_ids):
-                chunk = files[idx: idx + sizes[i]]
-                idx  += sizes[i]
 
-                # se non conosci il nome, usi l'ID; altrimenti ricava il nome via API
-                adset_name = adset_id  
+            for i, adset_id in enumerate(adset_ids):
+                chunk     = files[idx: idx + sizes[i]]
+                idx      += sizes[i]
+                adset_name = str(adset_id)  # se hai il nome öttenilo via API, altrimenti usa l'ID
 
                 for f in chunk:
                     name = os.path.splitext(f.name)[0]
                     ext  = os.path.splitext(f.name)[1].lower()
-                    # … (upload media come prima) …
+
+                    # salva temporaneo
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                    tmp.write(f.getbuffer())
+                    tmp.close()
+
+                    # upload e thumbnail
+                    if ext == ".mp4":
+                        media_id = upload_video(ad_account_id, tmp.name)
+                        cap = cv2.VideoCapture(tmp.name)
+                        ok, frame = cap.read()
+                        cap.release()
+                        if not ok:
+                            raise Exception("Impossibile estrarre frame dal video")
+                        tmp_th     = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                        cv2.imwrite(tmp_th.name, frame)
+                        thumb_hash = upload_image(ad_account_id, tmp_th.name)
+                        is_video   = True
+                    else:
+                        media_id   = upload_image(ad_account_id, tmp.name)
+                        thumb_hash = None
+                        is_video   = False
 
                     # UTM dinamici
                     utm = utm_base.copy()
@@ -425,6 +448,7 @@ if adset_mode == "Usa AdSet esistenti":
                     utm["utm_term"]    = name
                     link_with_utm      = build_utm_url(common_url, utm)
 
+                    # crea la creatività
                     creative_id = create_ad_creative(
                         ad_account_id=ad_account_id,
                         page_id=page_id,
@@ -432,14 +456,22 @@ if adset_mode == "Usa AdSet esistenti":
                         media_id=media_id,
                         primary_text=primary_text,
                         headline=headline,
-                        link_url=link_with_utm,    # <-- URL con UTM
+                        link_url=link_with_utm,
                         creative_name=name,
                         call_to_action=cta,
                         description=None if is_video else description,
                         is_video=is_video,
                         thumbnail_hash=thumb_hash
                     )
-                    # … resto invariato …
+
+                    # crea l'ad
+                    ad_id = create_ad(
+                        ad_account_id=ad_account_id,
+                        adset_id=adset_id,
+                        creative_id=creative_id,
+                        name=name
+                    )
+                    st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
 
             st.success(f"Tutte le {total} creatività aggiunte su {m} AdSet")
 
@@ -486,7 +518,26 @@ else:
                 for f in chunk:
                     name = os.path.splitext(f.name)[0]
                     ext  = os.path.splitext(f.name)[1].lower()
-                    # … (upload media come prima) …
+
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+                    tmp.write(f.getbuffer())
+                    tmp.close()
+
+                    if ext == ".mp4":
+                        media_id = upload_video(ad_account_id, tmp.name)
+                        cap = cv2.VideoCapture(tmp.name)
+                        ok, frame = cap.read()
+                        cap.release()
+                        if not ok:
+                            raise Exception("Impossibile estrarre frame dal video")
+                        tmp_th     = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                        cv2.imwrite(tmp_th.name, frame)
+                        thumb_hash = upload_image(ad_account_id, tmp_th.name)
+                        is_video   = True
+                    else:
+                        media_id   = upload_image(ad_account_id, tmp.name)
+                        thumb_hash = None
+                        is_video   = False
 
                     # UTM dinamici
                     utm = utm_base.copy()
@@ -501,15 +552,23 @@ else:
                         media_id=media_id,
                         primary_text=primary_text,
                         headline=headline,
-                        link_url=link_with_utm,    # <-- URL con UTM
+                        link_url=link_with_utm,
                         creative_name=name,
                         call_to_action=cta,
                         description=None if is_video else description,
                         is_video=is_video,
                         thumbnail_hash=thumb_hash
                     )
-                    # … resto invariato …
+
+                    ad_id = create_ad(
+                        ad_account_id=ad_account_id,
+                        adset_id=adset_id,
+                        creative_id=creative_id,
+                        name=name
+                    )
+                    st.write(f"✅ '{name}' → AdSet {adset_id}, Ad {ad_id}")
 
             st.success(f"Tutti i file distribuiti in {len(all_adset_ids)} AdSet")
+
 
 logging.debug("App end")
